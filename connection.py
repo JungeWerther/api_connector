@@ -1,7 +1,7 @@
 import getpass
 import requests
-import python.regex as regex
-import python.parsing as parsing
+import regex as regex
+import parsing
 import json
 import inspect
 import time
