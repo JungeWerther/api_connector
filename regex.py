@@ -1,5 +1,4 @@
 import re
-import markdown
 # def get_type(s: str) -> str:
 #     match = re.search(r'type=(\w+)', s)
 #     return match.group(1) if match else None 
@@ -30,14 +29,6 @@ def get_yaml_blocks(file_content, language):
     pattern = re.compile(r'```'+ re.escape(language) + '(.*?)```', re.DOTALL)
     matches = pattern.findall(file_content)
     return matches
-
-def get_code_blocks(md_text):
-        """NOT working"""
-        html = markdown.markdown(md_text)
-        print("[HTML]", html)
-        pattern = re.compile(r'<p><code>(.+?)</code></p>', re.DOTALL)
-        matches = pattern.findall(html)
-        return matches
 
 def find_nth_bracketed_message(s, n: int):
     match = re.search(r'(\[[^\]]+\])', s)

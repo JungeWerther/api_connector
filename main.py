@@ -21,6 +21,6 @@ def iter_date_range(start, end):
 # Nostradamus()
 # Zaalcapaciteit()
 
-for start, end in iter_date_range("2023-12-01", "2023-12-13"):
+for start, end in iter_date_range("2023-12-13", "2023-12-14"):
     Jewellabs(start=start, end=end)
     sleep(1)
