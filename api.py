@@ -1,10 +1,10 @@
-import python.regex as regex
+import regex
 import json
 from dotenv import load_dotenv
 import os
 import inspect
 from connection import Supabase, Connection
-import python.regex as regex
+import regex
 from datetime import date, time, timedelta, datetime
 from glom import glom, Coalesce, T, S, Flatten
 
