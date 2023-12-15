@@ -1,6 +1,6 @@
 import getpass
 import requests
-import python.regex as regex
+import regex as regex
 import python.parsing as parsing
 import json
 import inspect
