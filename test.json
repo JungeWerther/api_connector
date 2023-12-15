@@ -1,0 +1,16 @@
+[
+  {
+    "code": "PGRST202",
+    "details": "Searched for the function public.graphql without parameters, but no matches were found in the schema cache.",
+    "hint": null,
+    "message": "Could not find the function public.graphql without parameters in the schema cache"
+  },
+  {
+    "data": null,
+    "errors": [
+      {
+        "message": "query_ is null"
+      }
+    ]
+  }
+]

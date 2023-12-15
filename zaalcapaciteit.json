@@ -1,0 +1,79 @@
+{"locations": [
+    {
+    "id": 2669,
+    "name": "Filmzaal 1",
+    "capacity": 48
+},{
+    "id": 2670,
+    "name": "Filmzaal 2",
+    "capacity": 64
+},{
+    "id": 2671,
+    "name": "Filmzaal 3",
+    "capacity": 36
+},{
+    "id": 2672,
+    "name": "Filmzaal 4",
+    "capacity": 45
+},{
+    "id": 2572,
+    "name": "Auditorium",
+    "capacity": 127
+},{
+    "id": 2570,
+    "name": "Podiumzaal",
+    "capacity": 178
+},{
+    "id": 2582,
+    "name": "De Denkkamer",
+    "capacity": 10
+},{
+    "id": 2667,
+    "name": "Het Glas",
+    "capacity": 16
+},{
+    "id": 2668,
+    "name": "Broet",
+    "capacity": 60
+},{
+   "id": 2573,
+    "name": "Vide",
+    "capacity": 100 
+},{
+    "id": 2734,
+    "name": "Cafe-restaurant Begane Grond",
+    "capacity": -1
+},{
+    "id": 4224,
+    "name": "Hal Begane Grond",
+    "capacity": -1
+},{
+    "id": 4495,
+    "name": "Hal Eerste Verdieping",
+    "capacity": -1
+},{
+    "id": 2692,
+    "name": "Dick Raaijmakerszaal",
+    "capacity": -1
+}, {
+    "id": 4186,
+    "name": "De Nooijerzaal",
+    "capacity": -1
+},{
+    "id": 2691,
+    "name": "Baltan souterrain",
+    "capacity": -1
+}, {
+    "id": 2677,
+    "name": "Schoolplein SintLucas",
+    "capacity": -1
+}, {
+    "id": 3426,
+    "name": "Natlab",
+    "capacity": -1
+}, {
+    "id": 2765,
+    "name": "Extern",
+    "capacity": -1
+}]}
+

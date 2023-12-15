@@ -1,0 +1,258 @@
+{ 
+    "sources" : [
+        {
+            "name" : "Weaviate GraphQL",
+            "base_url" : "http://localhost:8080/test",
+            "method" : "GET",
+            "headers" : {
+                "Content-Type" : "application/json"
+            },
+            "body" : {
+                "test" : "test"
+            },
+            "format": {
+
+            }
+        },
+        {
+            "name": "Supabase API",
+            "base_url": "http://127.0.0.1:54321/graphql/v1",
+            "method": ["GET", "POST"],
+            "headers": {
+                "Content-Type": "application/json",
+                "API-KEY": "{key}"
+                },
+            "table": "test",
+            "_request": "{output}"
+        },
+    {
+        "name": "jewellabs_sales",
+        "base_url": "https://buz.jewellabs.net/reports/sales",
+        "rel_url": "?date={date}",
+        "method": "GET",
+        "headers": {
+            "Content-Type": "application/json",
+            "API-KEY": "{key}"
+            },
+        "sleep": 1,
+        "_request": [{
+            "content": "{obj}"
+        }],
+        "path": "./jltest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "jewellabs_show",
+        "base_url": "https://buz.jewellabs.net/rest/",
+        "rel_url": "shows.json?till_id=2338&start={start}&updated_after={updated_after}",
+        "method": "GET",
+        "auth": {
+            "user": "{user}",
+            "password": "{password}"
+        },
+        "headers": {
+            "Content-Type": "application/json",
+            "API-KEY": "{key}"
+            },
+        "_request": "{obj}",
+        "path": "./jltest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "jewellabs_theatre",
+        "base_url": "https://buz.jewellabs.net/rest/",
+        "rel_url": "theatres.json?till_id=2338",
+        "method": "GET",
+        "auth": {
+            "user": "{user}",
+            "password": "{password}"
+        },
+        "headers": {
+            "Content-Type": "application/json",
+            "API-KEY": "{key}"
+            },
+        "_request": "{obj}",
+        "path": "./jltest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "jewellabs_production",
+        "base_url": "https://buz.jewellabs.net/rest/",
+        "rel_url": "productions.json?till_id=2338",
+        "method": "GET",
+        "auth": {
+            "user": "{user}",
+            "password": "{password}"
+        },
+        "headers": {
+            "Content-Type": "application/json",
+            "API-KEY": "{key}"
+            },
+        "_request": "{obj}",
+        "path": "./jltest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "jewellabs_badge_type",
+        "base_url": "https://buz.jewellabs.net/rest/",
+        "rel_url": "badge_types.json?till_id=2338",
+        "method": "GET",
+        "auth": {
+            "user": "{user}",
+            "password": "{password}"
+        },
+        "headers": {
+            "Content-Type": "application/json",
+            "API-KEY": "{key}"
+            },
+        "_request": "{obj}",
+        "path": "./jltest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "jewellabs_product",
+        "base_url": "https://buz.jewellabs.net/rest/",
+        "rel_url": "products.json?till_id=2338",
+        "method": "GET",
+        "auth": {
+            "user": "{user}",
+            "password": "{password}"
+        },
+        "headers": {
+            "Content-Type": "application/json",
+            "API-KEY": "{key}"
+            },
+        "_request": "{obj}",
+        "path": "./jltest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "Mice_client",
+        "base_url": "https://api.miceoperations.com/api/v1/",
+        "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic {key}"
+            },
+        "method": "GET",
+        "clients": {
+            "rel_url": "clients?page={page}",
+            "_request": "{obj}"
+        },
+        "path": "./micetest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "Mice_location",
+        "base_url": "https://api.miceoperations.com/api/v1/",
+        "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic {key}"
+            },
+        "method": "GET",
+        "clients": {
+            "rel_url": "locations?page={page}",
+            "_request": "{obj}"
+        },
+        "path": "./micetest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "Mice_event",
+        "base_url": "https://api.miceoperations.com/api/v1/",
+        "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic {key}"
+            },
+        "method": "GET",
+        "rel_url": "events?page={page}&updated_after={updated_after}&items_per_page=25&include_products=true",
+        "_request": "{obj}",
+        "path": "./micetest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "Mice_invoice",
+        "base_url": "https://api.miceoperations.com/api/v1/",
+        "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic {key}"
+            },
+        "method": "GET",
+        "clients": {
+            "rel_url": "invoices?page={page}",
+            "_request": "{obj}"
+        },
+        "path": "./micetest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "untill_article",
+        "base_url": "https://{domain}/api/v1/{dbname}/",
+        "rel_url": "article",
+        "method": "GET",
+        "auth": {
+            "user": "{user}",
+            "password": "{password}"
+        },
+        "headers": {
+            "Content-Type": "application/json",
+            "AppToken": "{key}"
+        },
+        "_request": "{obj}",
+        "path":"./uttest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "untill_department",
+        "base_url": "https://{domain}/api/v1/{dbname}/",
+        "rel_url": "department-info",
+        "method": "GET",
+        "auth": {
+            "user": "{user}",
+            "password": "{password}"
+        },
+        "headers": {
+            "Content-Type": "application/json",
+            "AppToken": "{key}"
+        },
+        "_request": "{obj}",
+        "path":"./uttest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "untill_transaction",
+        "base_url": "https://{domain}/api/v1/{dbname}/",
+        "rel_url": "turnover-transaction?from={from_date}&till={till_date}",
+        "method": "GET",
+        "auth": {
+            "user": "{user}",
+            "password": "{password}"
+        },
+        "headers": {
+            "Content-Type": "application/json",
+            "AppToken": "{key}"
+        },
+        "_request": "{obj}",
+        "path":"./uttest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "nostradamus",
+        "base_url": "https://natlab.nostradamus.nu/index2.php?option=com_webservices&controller=csv&method=hours.board.fetch&element=",
+        "rel_url": "{element}&start={start}",
+        "method": "GET",
+        "headers": {
+            "Content-Type": "text/csv",
+            "api-key": "{key}"
+            },
+        "_request": "{obj}",
+        "path": "./nostradamustest.json",
+        "{obj}": "toFile_"
+    },
+    {
+        "name": "zaalcapaciteit_",
+        "path": "./zaalcapaciteit.json",
+        "_fromFile": "{obj}"
+    }
+]
+}
+
