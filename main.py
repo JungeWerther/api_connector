@@ -5,7 +5,7 @@ from time import sleep
 
 def iter_date_range(start, end):
     """
-    Takes a start date iso datestring and end date and returns an iterator of groups of 5 days. 
+    Takes a start date iso datestring and end date and returns an iterator of groups of n days. 
     Returns iterator that yields isoformat tuples of strings indicating only the first and last date of the group.
     """
     start = datetime.strptime(start, "%Y-%m-%d")
@@ -17,10 +17,23 @@ def iter_date_range(start, end):
 
 # Jewellabs(start="2022-01-02", end="2022-01-15")
 # Mice()  
-# Untill()
-# Nostradamus()
+            
+
+Untill("2024-01-03", "2024-01-05", mode="transaction") 
+
+# Nostradamus(start="2023-12-01", mode="hours")
+
+# for start, end in iter_date_range("2023-12-01", "2024-12-01"):
+#     # Untill(start, end, mode="transaction") TODO fix missing article_fkey include disabled articles...
+#     # Jewellabs(start=start, end=end, mode="sales")
+#     # Mice(start=start, end=end, mode="event")
+
+#     Nostradamus(start, mode="staff")
 # Zaalcapaciteit()
 
-for start, end in iter_date_range("2023-12-13", "2023-12-14"):
-    Jewellabs(start=start, end=end)
-    sleep(1)
+
+# Mice(start="2023-12-01", mode="event")
+
+# for start, end in iter_date_range("2023-12-11", "2024-01-17"):
+#     Jewellabs(start=start, end=end, mode="sales")
+#     sleep(1)

@@ -12,6 +12,10 @@ from glom import glom, Coalesce, T, S, Flatten
 
 load_dotenv()
 
+class Wrapper():
+    def __init__(self, start=None, end=None, mode=None):
+        pass
+        
 class APIConfig():
     """
     Class that loads and apiconfig file, then starts a connection.
@@ -95,7 +99,7 @@ class Transaction(Jsonic):
         self.created_at = created_at
         self.payment_type_id = payment_type_id
         self.payment_type_name = payment_type_name
-        self.psp_reference = psp_reference
+        self.psp_reference = None
         self.till_id = till_id
         self.selling_point_name = selling_point_name
 
@@ -107,7 +111,8 @@ def get_last_updated(schema):
     if len(data[1]) > 0:
         return data[1][0]["updated_at"]
     else:
-        raise ValueError("no last updated found for " + schema)
+        # raise ValueError("no last updated found for " + schema)
+        print(f"Warning: no last_updated found for {schema}")
     
 class SupaSchema():
     def __init__(self, schema="public", last_updated=None):
@@ -229,9 +234,25 @@ class Updater():
                 raise ValueError("no record found for " + self.record)
 
 class Nostradamus():
-    def __init__(self):
-        self.schema = SupaSchema("nostradamus", last_updated="2023-11-27")
+    """
+    mode: 
+        "departments" | 
+        "teams" | 
+        "staff" | 
+        "hours" | 
+        "freedays" | 
+        "planning" | 
+        "turnover (not active)" | 
+        "functions" | 
+        "project (not active)" | 
+        "salary"
+    """
+    def __init__(self, start=None, end=None, mode="hours"):
+        self.schema = SupaSchema("nostradamus")
         self.client = self.schema.client
+        self.start = start
+        self.end = end
+
 
         self.mode: str["departments" | 
                        "teams" | 
@@ -242,10 +263,7 @@ class Nostradamus():
                        "turnover (not active)" | 
                        "functions" | 
                        "project (not active)" | 
-                       "salary"] = "hours"
-
-        self.last_updated = self.schema.last_updated
-        dates = getdates(self.last_updated)
+                       "salary"] = mode
 
         key = os.environ.get("ND")
 
@@ -253,22 +271,12 @@ class Nostradamus():
             f"nostradamus", 
             element=self.mode,
             key=key,
-            start=dates[0],
+            start=self.start,
             debug=True
             )
 
         JL.connection.run()
-
-        # columns = SupaSchema("information_schema", last_updated="2023-01-01")
-        # columns = columns.return_table_columns(self.mode)
-        # print("[COLUMNS]", columns)
-
         self.process(JL.connection.config.obj)
-
-        # match self.mode:
-        #     case "departments":
-                # self.schema.upsert("departments", res["departments"])
-      
 
     def process(self, data):
         for response in data:
@@ -354,19 +362,6 @@ class Nostradamus():
         return lambda x: None if x[key] == "0000-00-00 00:00:00" else x[key]
 
     def filter_hours(self, data):
-    #      card_id bigint references nostradamus.staff,
-    # card_name text,
-    # hour_id bigint,
-    # hour_office_id bigint,
-    # hour_department_id bigint,
-    # hour_team_id bigint,
-    # hour_date date,
-    # hour_hours float,
-    # hour_enter timestamp,
-    # hour_exit timestamp,
-    # hour_state bigint,
-    # hour_type bigint,
-    # project_id bigint
         spec = {
             "hours": ("response", [{
                 "card_id": self.coalesce_empty_to_null("card_id"),
@@ -385,14 +380,6 @@ class Nostradamus():
         return glom(data, spec)
     
     def filter_freedays(self, data):
-    #       card_id bigint references nostradamus.staff,
-    # freeday_id bigint,
-    # freeday_start date,
-    # freeday_end date,
-    # freeday_days float,
-    # freeday_type bigint,
-    # freeday_hours float
-        
         spec = {
             "freedays": ("response", [{
                 "card_id": "card_id",
@@ -406,17 +393,6 @@ class Nostradamus():
         return glom(data, spec)
     
     def filter_planning(self, data):
-    #      planning_workspace_name text,
-    # planning_workplace_type bigint,
-    # planning_workplace_id bigint,
-    # planning_team_id bigint references nostradamus.teams,
-    # planning_start timestamp,
-    # planning_hours float,
-    # planning_end timestamp,
-    # planning_department_id bigint references nostradamus.departments,
-    # planning_date date,
-    # planning_costs float,
-    # card_id bigint references nostradamus.staff
         spec = {
             "planning": ("response", [{
                 "card_id": self.coalesce_empty_to_null("card_id"),
@@ -430,25 +406,11 @@ class Nostradamus():
                 "planning_costs": "planning_costs"
             }])}
         return glom(data, spec)
-    
-    # def coalesce_time_to_timestamp(self, date_str, time_str):
-    #     dt = datetime.strptime(time_str, '%H:%M:%S')
-
         
     def adjust_time(self, date_field, time_field):
         return lambda x: datetime.combine(datetime.strptime(x[date_field], "%Y-%m-%d") + timedelta(days=int(x[time_field].split(':')[0])//24), datetime.strptime('00:'+x[time_field].split(':')[1]+':'+x[time_field].split(':')[2],'%H:%M:%S').replace(hour=int(x[time_field].split(':')[0])%24).time()).isoformat()
-    
-    # def apply_modulo_time(self, date_str, time_str):
-    #     datetime.combine(datetime.strptime(date_str, "%Y-%m-%d"), datetime.strptime(time_str,'%H:%M:%S').time())
-    
-    def filter_turnover(self, data):
-    # article_id bigint,
-    # article_name text,
-    # articles_value float,
-    # articles_sold bigint,
-    # articles_turnover float,
-    # date timestamp
 
+    def filter_turnover(self, data):
         spec = {
             "turnover": ("response", [{
                 "article_id": "article_id",
@@ -460,12 +422,7 @@ class Nostradamus():
             }])}
         return glom(data, spec)
 
-    def filter_functions(self, data):
-    #     function_id bigint primary key,
-    # function_name text,
-    # department_id bigint references nostradamus.departments,
-    # function_accountant text,
-    # function_state bigint        
+    def filter_functions(self, data):   
         spec = {
             "functions": ("response", [{
                 "function_id": "function_id",
@@ -502,23 +459,6 @@ class Nostradamus():
         return glom(data, spec)
 
     def filter_salary(self, data):
-    #     id bigint primary key,
-    # card_id bigint references nostradamus.staff,
-    # cao_id bigint,
-    # salary_start_date date,
-    # salary_end_date date,
-    # salary_level bigint,
-    # salary_wage_group bigint,
-    # salary_use_wage bigint,
-    # salary_base float,
-    # salary_extra float,
-    # salary_bonus float,
-    # salary_total float,
-    # salary_holiday_days_percentage float,
-    # salary_holiday_legal_percentage decimal,
-    # salary_holiday_extralegal_percentage decimal,
-    # salary_holiday_money_percentage float,
-    # salary_rate float
         spec = {
             "salary": ("response", [{
                 "id": "id",
@@ -546,36 +486,41 @@ class Nostradamus():
         
 
 class Untill():
-    def __init__(self):
+    """
+    mode in ["article" | "department" | "transaction"]
+    """
+    def __init__(self, start=None, end=None, mode: str = "transaction"):
         self.schema = SupaSchema("untill", last_updated="2023-01-01")
         self.client = self.schema.client
 
         self.last_updated = self.schema.last_updated
+
         dates = getdates(self.last_updated)
         datetimes = dates_to_datetimes(dates)[0:3]
+
+        self.start = date_to_datetime(start)
+        self.end = date_to_datetime(end)
+
+        # attention: transaction trumps bill. RUN department > article > transaction
+        self.mode: str["article" | "department" | "transaction"] = mode
         
         key = os.environ.get("UNTILL")
         user = os.environ.get("UNTILL_USER")
         password = os.environ.get("UNTILL_PASSWORD")
 
-        # attention: transaction trumps bill. RUN department > article > transaction
-        self.mode: str["article" | "department" | "transaction" ] = "department"
-        
         JL = APIConfig(
             f"untill_{self.mode}", 
             key=key,
-            from_date=datetimes[0],
-            till_date=datetimes[-1],
+            from_date=self.start if start is not None else datetimes[0],
+            till_date=self.end if end is not None else datetimes[-1],
             user=user,
             password=password,
             dbname="NAT-POS2",
-            domain="vpn.plazafutura.nl/shield",
+            domain="http://92.64.72.50:443",
             debug=True
             )
         
         # testapi.untill.com/shield
-        # JL.connection.config.from_date = self.last_updated
-        # JL.connection.config.till_date = dates[-1]
 
         JL.connection.run()
 
@@ -688,11 +633,11 @@ class Untill():
                             ("items.*", [
                                 {
                                     "id": "id", 
-                                    "article_id": "articleId",
+                                    "article_id": ("articleId", lambda x: x if x != 0 else None),
                                     "quantity": "quantity",
                                     "price": "price",
                                     "vat": "vat",
-                                    "returned": "returned",
+                                    "returned": Coalesce("returned", default=None),
                                     "transaction_id": S["transaction_id"]
                             }
                             ])
@@ -726,21 +671,26 @@ class Zaalcapaciteit():
         return data
 
 class Mice():
-    def __init__(self):
-        self.schema = SupaSchema("mice_operations", last_updated="2023-11-20")
+    """ 
+    mode: str[client | location | event]
+    """
+    def __init__(self, start=None, end=None, mode="event"):
+        self.schema = SupaSchema("mice_operations")
         self.client = self.schema.client
+        self.start = start
+        self.end = end
+        self.mode = mode
 
-        # client | location | event
-        self.mode = "event"
+        if self.start is None:
+            raise ValueError("class Mice requires start parameter")
 
         key = os.environ.get("MC")
         JL = APIConfig(
             f"Mice_{self.mode}",
-            key=key
+            key=key,
+            debug=False,
+            updated_after=self.start
             )
-        
-        JL.connection.config.debug = False
-        JL.connection.config.updated_after = self.schema.last_updated
 
         # run a first time to get the number of pages. Already process (why not?)
         JL.connection.config.page = str(1)
@@ -942,7 +892,9 @@ class Mice():
         return data
     
 class Jewellabs():
-    """Available modes: ["sales"|"show"|"product"|"production"|"badge_type"|"theatre"]"""
+    """Available modes: ["sales"|"show"|"product"|"production"|"badge_type"|"theatre"]
+    TODO: fix bug here with non-sales loop...
+    """
     def __init__(self, 
                  start=None, 
                  end=None, 
@@ -1159,5 +1111,7 @@ def daterange(start=None, end=None):
     return dates
 
 def dates_to_datetimes(dates):
-    return [date + "T00:00:00Z" for date in dates]
+    return [date_to_datetime(date) for date in dates]
 
+def date_to_datetime(date):
+    return date + "T00:00:00Z"

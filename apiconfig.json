@@ -186,7 +186,7 @@
     },
     {
         "name": "untill_article",
-        "base_url": "https://{domain}/api/v1/{dbname}/",
+        "base_url": "{domain}/api/v1/{dbname}/",
         "rel_url": "article",
         "method": "GET",
         "auth": {
@@ -203,7 +203,7 @@
     },
     {
         "name": "untill_department",
-        "base_url": "https://{domain}/api/v1/{dbname}/",
+        "base_url": "{domain}/api/v1/{dbname}/",
         "rel_url": "department-info",
         "method": "GET",
         "auth": {
@@ -220,7 +220,7 @@
     },
     {
         "name": "untill_transaction",
-        "base_url": "https://{domain}/api/v1/{dbname}/",
+        "base_url": "{domain}/api/v1/{dbname}/",
         "rel_url": "turnover-transaction?from={from_date}&till={till_date}",
         "method": "GET",
         "auth": {
