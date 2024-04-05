@@ -7,13 +7,14 @@ import getpass
 import requests
 
 # data
-from itertools import product
 import csv
 import hashlib
 import uuid
 
 # custom
 from Connect import regex, parsing
+from Connect.errors import add_error
+from Connect.helpers import flatten_dict
 
 # supabase-py
 from gotrue import SyncMemoryStorage
@@ -84,18 +85,11 @@ class Callables():
     def __init__(self, config=None, debug=False):
         self.config = config
         self.debug = debug
-    
-    def flatten_dict(self, **d):
-        """Flatten a dictionary (one level)."""
-
-        keys, values = zip(*d.items())
-        for instance in product(*(x if isinstance(x, list) else [x] for x in values)):
-            yield dict(list(zip(keys, instance)))
             
     def caller(self, func, **kwargs):
         """Flatten kwargs and call func on each instance. Return aggregate"""
         q = []
-        for p in self.flatten_dict(**kwargs):
+        for p in flatten_dict(**kwargs):
             # print("[CALLING]", func.__name__, "with parameters:", p)
             q.append(func(**p))
 
@@ -115,6 +109,23 @@ class Callables():
                 return res
         return value
     
+    @add_error("Unable to parse response (hint: change the Content-Type)", 472)
+    def parse_doctype(self, res, doctype):
+        """Parse a doctype from a string"""
+        match doctype:
+            case "application/xml":
+                return parsing.parse_xml(res.text)
+            case "application/json":
+                return res.json()
+            case "text/csv":
+                r = csv.DictReader(res.text.splitlines())
+                return {"response": [q for q in r]}
+            case "application/html":
+                # the xml parser also works for html
+                return parsing.parse_html(res.text)
+            case _:
+                return res.json()
+    
     def _request(self, 
             url=None, 
             base_url=None, 
@@ -130,6 +141,7 @@ class Callables():
         TODO: implement POST, PUT methods.
         """
         
+        print("Requesting:", url)
         try:
             auth = (auth["user"], auth["password"]) if auth is not None else None
         except:
@@ -179,18 +191,7 @@ class Callables():
             with open("./debug.html", "w") as f:
                 f.write(res.text)
         
-        if headers["Content-Type"] == "application/xml":
-            return parsing.parse_xml(res.text)
-        elif headers["Content-Type"] == "application/json":
-            return res.json()
-        elif headers["Content-Type"] == "text/csv":
-            r = csv.DictReader(res.text.splitlines())
-            return {"response": [q for q in r]}
-        elif headers["Content-Type"] == "application/html":
-            # the xml parser also works for html
-            return parsing.parse_html(res.text)
-        else:
-            return res.json()
+        return self.parse_doctype(res, headers["Content-Type"])
         
     def new_session(self, auth, headers):
         """Create a new session"""
@@ -320,6 +321,7 @@ class Writeables():
 
         return("asd")
     
+    @add_error(f"Error calling function {__name__}", 472)
     def caller(self, func, data, **kwargs):
         """Flatten kwargs and call func on each instance. Return aggregate"""
         return func(data, **kwargs)
@@ -328,26 +330,32 @@ class DataOBJ():
     """Data Object.
     -> Used for logging raw response data
     """
-    def __init__(self, func, callables_obj, **kwargs):
+    def __init__(self, data=None, func=None, callables_obj: Callables=None, **kwargs):
+        print("[DataOBJ]", kwargs)
+
+        self.data = data
         self.func = func
         self.kwargs = kwargs
-        self.censor = callables_obj.censor
-        self.config = callables_obj.config
-        self.path = "./response_cache/" + self.to_file_path()
 
-        if self.path_exists():
-            print("reading cache stored at:", self.path, "\n")
-            self.data = callables_obj._fromFile(self.path)
-        else:
-            print("[FUNCTION]", func.__name__)
-            self.data = callables_obj.caller(func, **kwargs)
-            
+        if func is not None and callables_obj is not None:
+            self.censor = callables_obj.censor
+            self.config = callables_obj.config
+            self.path = "./response_cache/" + self.to_file_path()
+
+            if self.path_exists():
+                print("reading cache stored at:", self.path, "\n")
+                self.data = callables_obj._fromFile(self.path)
+            else:
+                print("[FUNCTION]", func.__name__)
+                
+                self.data = callables_obj.caller(func, **kwargs)
+                
             if hasattr(self.config, "cache"):
                 if not self.config.cache:
                     pass
                 else: self.save_snapshot(self.path)
-            # uncomment if you want to enable cache by default
-            # else: self.save_snapshot(self.path)
+                # uncomment if you want to enable cache by default
+                # else: self.save_snapshot(self.path)
     
     def __repr__(self) -> str:
         return "data: " + self.data_truncated() + "\n"
@@ -444,7 +452,8 @@ class Connection():
         
         # return args that can be passed to func.
         return iargs
-                
+
+    @add_error(f"Error evaluating function spec. Check your syntax.", 471)   
     def evaluate(self, 
                  key, 
                  value, 
@@ -458,26 +467,13 @@ class Connection():
         BE CAREFUL when adding functions in case you're exposing config to UI in production. Config can execute ANY function in self.functions = Callables().
         """
 
-        # call function if callable, store result in self.config (GLOBAL data source for each action).
-        if self.key_callable(key):
-            func = getattr(self.functions, key)
-            iargs = self.trimargs(func)
-
-            self.data = DataOBJ(func, self.functions, **iargs)
-        
-            # after calling a function, we want our value (as defined in config) 
-            # to be isomorphic to the data in the DataOBJ.
-            in_function_call = True
-            path=[]
-
         # traverse dict recursively, while keeping track of path
         match value:
             case dict():
-                for k, v in value.items():
-                    q = self.evaluate(k, v, path + [k], in_function_call)
-                    
-                    # updated nested dictionary values
-                    value[k] = q[0] if isinstance(q, list) else q
+                value = list(flatten_dict(**{
+                    k: self.evaluate(k, v, path + [k], in_function_call) for k, v in value.items()
+                }))
+
             case list():
                 for index, item in enumerate(value):
                     if isinstance(item, dict):
@@ -490,6 +486,7 @@ class Connection():
                 
                 # TODO: abstract extracted_data
                 # value is the function name in Writeables here if true.
+                # call function if callable, store result in self.config (GLOBAL data source for each action).
 
                 if self.value_writeable(value):
                     func = getattr(self.writeables, value)
@@ -528,13 +525,52 @@ class Connection():
                             self.config.__setattr__(
                                 variable, extracted_data
                                 )
+            case _:
+                raise ValueError("Invalid value type in spec. Must be dict, list or str.")
 
-        
         # Define non-callable keys specified in config as attributes in self.config:
         if not in_function_call: 
             self.config.__setattr__(key, value)    
             print("Setting:", key, "-->", type(value).__name__ + ":", self.functions.censor(json.dumps(value)))
-            
+        
+        # After evaluating the value, we want to call the function specified in the key.
+        if self.key_callable(key):            
+            # TODO: match function arguments with passed kwargs in self.config.<funcName>
+            # qargs = self.trimargs(func)
+
+            func = getattr(self.functions, key)
+            iargs = getattr(self.config, key)
+
+            # self.config.<funcName> is a dictionary of arguments now, to be passed to the function.
+            # print("iargs", iargs)
+
+            match iargs:
+                case dict():
+                    self.data = DataOBJ(
+                        func=func, 
+                        callables_obj=self.functions, 
+                        **iargs)
+                case list():
+                    # TODO: decide whether we want to permit some calls to fail.
+                    self.data = DataOBJ(
+                        data=[
+                            j for i in iargs for j in DataOBJ(
+                                func=func, 
+                                callables_obj=self.functions, 
+                                **i).data
+                            ])
+                            
+            print(self.data)
+            # print("[SUCCESS] Storing data in key variable", key)
+            # Also assign the retrieved value to the keyname, even if it is a function.
+            self.config.__setattr__(key, self.data.data)    
+            print("Setting:", key, "-->", type(self.data.data).__name__ + ":", self.functions.censor(json.dumps(self.data.data)))
+        
+            # after calling a function, we want our value (as defined in config) 
+            # to be isomorphic to the data in the DataOBJ. (???)
+            in_function_call = True
+            path=[]
+
         return value
 
     
@@ -544,7 +580,8 @@ class Connection():
         Always returns list.
         """
         lst = []
-
+        print("unpacking:", value, "with", variable)
+        
         # for each value
         if isinstance(value, list):
             for v in value:
@@ -570,6 +607,7 @@ class Connection():
                 
         return lst
 
+    @add_error("Syntax Error: could not find non-secret variable. If you use the brackets syntax '\{name\}', you need to define a variable with key 'name' first.", 471)
     def locate_in_dict(self, path, dictionary):
         """Locates a value in a nested dictionary."""
         
