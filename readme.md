@@ -2,6 +2,8 @@
 
 Useful in case you want to **move data from one place into another** in a lightweight fashion.
 
+Python version 3.10+
+
 ## Function calling
 Prepend an underscore ("_<function_name>") to the key of your key-value pair to execute an associated function with arguments defined by its associated value. By convention, use the ("<function_name>_") syntax when putting data somewhere else. 
 
