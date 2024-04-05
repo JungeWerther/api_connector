@@ -24,7 +24,7 @@ So you can keep your API-keys encrypted-at-rest, and send different types of req
 }
 ```
 
-will send two GET requests, one to example.com and one to pearstop.com. The result is stored inside a separate object that you can call upon by specifying "{_<function_name>}" as a value.
+will send two GET requests, one to example.com and one to pearstop.com. The result is stored inside a separate object that you can call upon by specifying "{_<function_name>}" as a value. **In fact, all keynames are accessible as variables**, which is very useful in case you want to make your api-connectors more readable.
 
 ## Nested requests with a single JSON definition.
 Imagine you are connecting with an API that requires you to get a new access token using an existing refresh token, which is subsequently used to obtain data. Then you could do something like:
