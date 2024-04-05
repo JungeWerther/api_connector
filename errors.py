@@ -1,3 +1,5 @@
+"""Error classes and decorators for the APIConnector module."""
+
 # custom error class for all api-connector related errors
 class APIConnectorError(BaseException):
     """Base class for APIConnector errors."""
