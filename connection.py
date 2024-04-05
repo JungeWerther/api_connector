@@ -373,33 +373,26 @@ class DataOBJ():
         return hashlib.sha256(string.encode()).hexdigest()
     
 class Connection():
-    """Connection Class"""
+    """Connection Class. This is the main class that traverses the configuration file."""
 
     def __init__(self, 
-        config=None, 
+        spec=None, 
         debug: bool=False,
         **kwargs
         ):
         
         self.debug = debug
-        self.rawconf = config
+        self.spec = spec
         self.data = None
 
-        # initialize empty configuration class
-        self.config = Config()
-        self._set_kwargs(**kwargs)
+        # initialize configuration class with passed kwargs.
+        self.config = Config(**kwargs)
         
         # instantiate Callables class instance with permanent access to config.
         self.functions = Callables(self.config)
 
         # instantiate Writeables class instance with permanent access to config.
         self.writeables = Writeables(self.config)
-
-    def _set_kwargs(self, **kwargs):
-        """Set kwargs"""
-        # TODO: obfuscate keys in server logs.
-        for k in kwargs.keys():
-            self.config.__setattr__(k, kwargs[k])
 
     def get_key(self):
         """Get the key from the user"""
@@ -412,7 +405,7 @@ class Connection():
     def traverse_config(self):
         """Traverses the passed configuration"""
         
-        for key, value in self.rawconf.items():
+        for key, value in self.spec.items():
             self.evaluate(key, value)
     
     def key_callable(self, key):
@@ -464,7 +457,7 @@ class Connection():
         Callable functions must be designated with _<function_name> in config. 
         BE CAREFUL when adding functions in case you're exposing config to UI in production. Config can execute ANY function in self.functions = Callables().
         """
-        
+
         # call function if callable, store result in self.config (GLOBAL data source for each action).
         if self.key_callable(key):
             func = getattr(self.functions, key)
