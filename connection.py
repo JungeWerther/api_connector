@@ -5,6 +5,7 @@ import json
 import time
 import getpass
 import requests
+from requests import Response
 
 # data
 import csv
@@ -116,8 +117,9 @@ class Callables():
         return value[:100] + " ... " if len(value) > 100 else value
     
     @add_error("Unable to parse response (hint: change the Content-Type)", 472)
-    def parse_doctype(self, res, doctype):
+    def parse_doctype(self, res: Response, doctype: str) -> dict | str:
         """Parse a doctype from a string"""
+        
         match doctype:
             case "application/xml":
                 return parsing.parse_xml(res.text)
