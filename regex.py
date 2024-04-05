@@ -15,7 +15,7 @@ def get_text_between_tokens(s):
 
 def parse_error_log(log):
     """Parse an error log file, find messages encapsulated in [MESSAGE] tags."""
-    with open(log, 'r') as f:
+    with open(log, 'rt') as f:
         content = f.read()
 
     pattern = r'\[MESSAGE\] (.*?)\n\t(.*?)\n'
@@ -98,9 +98,11 @@ def have_same_base_url(url1, url2):
 def return_escapable_variables(s: str) -> list:
     """Return all variables that can be escaped in a string."""
     return re.findall(r'\{(.+?)\}', s)
-                
+
 def list_to_file_path(l: list) -> str:
-    """replace all slashes with underscores and join a list of strings with underscores, so it can be saved as a file path"""
+    """Replace all slashes with underscores and join a list of strings with underscores: 
+        --> so it can be saved as a file path
+    """
     return re.sub(r'/', '_', '_'.join(l) + '.json')
 
 def simple_tokenize_words(s: str) -> list:

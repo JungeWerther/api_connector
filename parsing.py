@@ -1,13 +1,10 @@
-"""Parsing methods for different data types"""
+"""Parsing methods for different data types."""
 
 import xmltodict
 
 def parse_xml(xml: str) -> dict:
     """Parses xml string to dict"""
-    try:
-        obj = xmltodict.parse(xml)
-    except:
-        print("Warning: Could not parse xml. Check returned xml string in response cache.")
+    obj = xmltodict.parse(xml)
     return obj
 
 def parse_html(html: str) -> str:
