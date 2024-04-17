@@ -1,21 +1,23 @@
 # system
+# import uuid
 import os
 import inspect
 import json
 import time
 import getpass
-import requests
-from requests import Response, Session
 
 # data
 import csv
 import hashlib
-import uuid
+
+# requests
+import requests
+from requests import Response, Session
 
 # custom
-from Connect import regex, parsing
-from Connect.errors import add_error
-from Connect.helpers import flatten_dict
+from . import regex, parsing
+from .errors import add_error
+from .helpers import flatten_dict
 
 # supabase-py
 from gotrue import SyncMemoryStorage
@@ -26,7 +28,7 @@ from storage3.types import CreateOrUpdateBucketOptions
 # Default file size limit = 26MB
 DEFAULT_FILE_SIZE_LIMIT = 26000000
 
-# TODO: implement caching strategy when referencing data in config. 
+# TODO: implement caching strategy when referencing data in config.
 # Right now, we're just unpacking a list and returning it itself.
 # This can introduce bugs if the data contains the {var} syntax.
 # One strategy could be to protect the data keyword.
@@ -59,7 +61,7 @@ class AnyClient():
         self.key: str = token
         self.client: Client = create_client(
             self.url,
-            self.key, 
+            self.key,
             ClientOptions(
                 schema=schema,
                 storage=SyncMemoryStorage()
@@ -81,7 +83,10 @@ class AnonClient(AnyClient):
             )
 
 class ServiceRoleClient(AnyClient):
-    """ServiceRoleClient class. Inherits from AnyClient. Bypasses RLS on underlying database. Use with care."""
+    """
+    ServiceRoleClient class. Inherits from AnyClient. 
+    Bypasses RLS on underlying database. Use with care.
+    """
     def __init__(self, schema: str):
         super().__init__(
             self.get_service_role_key(),
@@ -169,7 +174,7 @@ class Callables():
             else:
                 raise SyntaxError("Both url and base_url undefined")
 
-        if debug: 
+        if debug:
             print("Requesting:", url)
 
         if method is None:
@@ -182,7 +187,8 @@ class Callables():
                 "Content-Type": "application/json"
             }
 
-        # If there is no session, or if session config has changed in the meantime, create a new session.
+        # If there is no session, or if session config has changed in the meantime, 
+        # create a new session.
         if session is None or (
             session.auth != auth or
             session.headers != headers
@@ -261,7 +267,10 @@ class Writeables():
         self.metadata = self.config.metadata or None
 
     def toSupa_(self, data, table: str, overwrite: bool=False):
-        """Upsert data to supabase table. You need a supabase session cookie. Let me know if you have any trouble here, I can help."""
+        """
+        Upsert data to supabase table. You need a supabase session cookie. 
+        Let me know if you have any trouble here, I can help.
+        """
 
         if overwrite: print("[WARNING] overwrite needs implementation")
         if self.decoded is None: raise ValueError("invalid session")
@@ -444,14 +453,14 @@ class Connection():
         Criterium for a function to be callable from config. 
         Must start with _ and exist as a function in self.functions
         """
-        return (key in dir(self.functions)) and key[0]=="_"
+        return (key in dir(self.functions)) and key[0]=="_" and key[1]!="_"
 
     def key_writeable(self, key):
         """
         Criterium for a function to be a writer function callable from config. 
         Must end with _ and exist as a function in self.writeables.functions
         """
-        return (key in dir(self.writeables)) and key[-1]=="_"
+        return (key in dir(self.writeables)) and key[-1]=="_" and key[-2]!="_"
 
     def trimargs(self, func):
         """Returns a list of arguments that can be passed to func."""    
