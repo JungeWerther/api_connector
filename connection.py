@@ -101,7 +101,9 @@ class ServiceRoleClient(AnyClient):
 
 
 class Callables():
-    """Class to define explicit methods callable from config"""
+    """Class to define explicit methods callable from config.
+    Important: you need to add type hints and return signatures.
+    """
     def __init__(self, config=None, debug=False):
         self.config = config
         self.debug = debug
@@ -132,7 +134,8 @@ class Callables():
     @add_error("Unable to parse response (hint: change the Content-Type)", 472)
     def parse_doctype(self, res: Response, doctype: str) -> dict | str:
         """Parse a doctype from a string"""
-
+        print("Parsing doctype:", doctype)
+        print("Response:", res.text[:100])
         match doctype:
             case "application/xml":
                 return parsing.parse_xml(res.text)
@@ -147,6 +150,7 @@ class Callables():
             case _:
                 return res.json()
 
+    @add_error("Error calling function", 472)
     def _request(self,
             url=None,
             base_url=None,
@@ -157,7 +161,7 @@ class Callables():
             session: Session=None,
             sleep=0,
             debug=False,
-            ):
+            ) -> dict | str | list:
         """send a request with the specified parameters
         TODO: implement POST, PUT methods.
         """
@@ -200,8 +204,20 @@ class Callables():
             time.sleep(sleep)
 
         if method == "GET":
-            res = session.get(url)
+            print("GET request")
+            try:
+                res = session.get(url)
+            except Exception as e:                
+                raise e
+        
+            if res is None:
+                print("No response from server")
+            else:
+                print("Response:")
+                print(type(res))
+        
         elif method == "POST":
+            print("POST request")
             res = session.post(url)
         else:
             raise ValueError(f"{method} needs implementation")
@@ -213,7 +229,7 @@ class Callables():
                 )
             with open("./debug.html", "wt") as f:
                 f.write(res.text)
-
+        
         return self.parse_doctype(res, headers["Content-Type"])
 
     def new_session(self, auth, headers):
@@ -240,18 +256,21 @@ class Callables():
 
         return obj
 
-    def _test(self, base_url, rel_url=""):
+    def _test(self, base_url, rel_url="") -> str:
+        """Test function. Can you pass base_url and rel_url to get url?"""
         url = base_url + rel_url
         return url
 
-# TODO: figure out kwargs situation. (?)
 class Config():
     """Class used as target for configuration settings. Define special methods here."""
     def __init__(self, **kwargs):
 
         # initialize config with any passed kwargs
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+        # for k, v in kwargs.items():
+        #     setattr(self, k, v)
+
+        # does this work?
+        self.add_attributes(**kwargs)
 
     def add_attributes(self, **kwargs):
         """Add attributes to config"""
@@ -263,10 +282,11 @@ class Writeables():
     def __init__(self, config=None, debug=False):
         self.config = config
         self.debug = debug
-        self.decoded = self.config.decoded or None
-        self.metadata = self.config.metadata or None
+        self.decoded = getattr(self.config, "decoded", None)
+        self.metadata = getattr(self.config, "metadata", None)
 
-    def toSupa_(self, data, table: str, overwrite: bool=False):
+    @add_error("Error calling function", 472)
+    def toSupa_(self, data, table: str, schema: str = "etl", overwrite: bool=False) -> None:
         """
         Upsert data to supabase table. You need a supabase session cookie. 
         Let me know if you have any trouble here, I can help.
@@ -275,7 +295,7 @@ class Writeables():
         if overwrite: print("[WARNING] overwrite needs implementation")
         if self.decoded is None: raise ValueError("invalid session")
 
-        client = AnyClient(self.decoded.token, schema="etl").client
+        client = AnyClient(self.decoded.token, schema=schema).client
         user_tld = client.from_("organization").select("tld").single().execute().data["tld"]
         newclient = AnyClient(self.decoded.token, schema=user_tld).client
 
@@ -462,6 +482,38 @@ class Connection():
         """
         return (key in dir(self.writeables)) and key[-1]=="_" and key[-2]!="_"
 
+    def get_callables(self):
+        """Return a list of callable functions in self.functions"""
+        return [f for f in dir(self.functions) if self.key_callable(f)]
+    
+    def get_writeables(self):
+        """Return a list of writeable functions in self.writeables"""
+        return [f for f in dir(self.writeables) if self.key_writeable(f)]
+    
+    def get_callable_signature(self, func_name):
+        """Return the signature of a callable function"""
+        return inspect.signature(getattr(self.functions, func_name))
+    
+    def get_writeable_signature(self, func_name):
+        """Return the signature of a writeable function"""
+        return inspect.signature(getattr(self.writeables, func_name))
+    
+    def get_callable_return_type(self, func_name):
+        """DEPRECIATED: Return the return type of a callable function"""
+        return inspect.getfullargspec(getattr(self.functions, func_name)).annotations.get("return", None)
+    
+    def get_writeable_return_type(self, func_name):
+        """DEPRECTIATED: Return the return type of a writeable function"""
+        return inspect.getfullargspec(getattr(self.writeables, func_name)).annotations.get("return", None)
+    
+    def get_callable_description(self, func_name):
+        """Return the description of a callable function"""
+        return inspect.getdoc(getattr(self.functions, func_name))
+    
+    def get_writeable_description(self, func_name):
+        """Return the description of a writeable function"""
+        return inspect.getdoc(getattr(self.writeables, func_name))
+    
     def trimargs(self, func):
         """Returns a list of arguments that can be passed to func."""    
 
@@ -489,6 +541,7 @@ class Connection():
 
         # return args that can be passed to func.
         return iargs
+    
     def val_data(self, value: str):
         """
         Check if value corresponds to an escaped callable. 
@@ -594,10 +647,12 @@ class Connection():
             match iargs:
                 case dict():
                     do = self.writeables.caller(func, **iargs)
+                    
                     print(do)
                 case list():
                     for i in iargs:
                         do = self.writeables.caller(func, **i)
+        
                         print(do)
 
         # handle callables

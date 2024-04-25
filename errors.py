@@ -1,3 +1,4 @@
+from functools import wraps
 """Error classes and decorators for the APIConnector module."""
 
 # custom error class for all api-connector related errors
@@ -13,6 +14,7 @@ class APIConnectorError(BaseException):
 def add_error(message, code):
     """Decorator to add error handling to a function."""
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
