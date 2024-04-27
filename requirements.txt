@@ -1,3 +1,4 @@
 supabase
 xmltodict
 requests
+glom
