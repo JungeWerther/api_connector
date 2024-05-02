@@ -5,7 +5,7 @@
 # and needs manual cleaning!
 # 
 # Ideally we also want:
-# TODO: to support dynamic keys.
+# DONE: to support dynamic keys. Using the collapse_dynamic flag, we can collapse
 # --> I think the best way is to vectorize all keynames.
 # TODO: lists nested in lists (?) srsly? who the hell designs apis like that?
 # DONE: type resolution (except directly nested lists)
@@ -122,6 +122,12 @@ class ComplexType():
             else:
                 self.structure[key] = value
 
+    def items(self):
+        return self.structure.items()
+
+    def values(self):
+        return self.structure.values()
+    
     @staticmethod
     def is_ext_subclass(type1: type, type2: type) -> bool:
         """Check if type1 is a subclass of type2, including external subclasses."""
@@ -224,10 +230,12 @@ class ComplexType():
         return ComplexType.union_helper(all_merged)
 
 class Hypothesis():
-    def __init__(self, v=None):
+    def __init__(self, v=None, collapse_dynamic=False):
         self.current = ComplexType()
         if v is not None:
             self.update(v)
+        if collapse_dynamic:
+            self.collapse_nested_dicts()
     
     def handle_kv(self, k, v):
         if k not in self.current.structure:
@@ -242,6 +250,36 @@ class Hypothesis():
         else:
             # Recursively update the nested dictionary
             self.current.structure[k].update_with(Hypothesis(v).current)
+        
+    def collapse_nested_dicts(self):
+        """Collapse nested dictionaries into a list of dictionaries.
+        BUG: converts str -> type because the type of a type is type.
+        Needs fixing in hypothesis logic (ignore casing type to type but return id)
+        """
+        def transform(item):
+            # Base case for recursion: if item is not a dictionary, return it as is
+            
+            if isinstance(item, list):
+                return [transform(i) for i in item]
+            
+            if not isinstance(item, dict | ComplexType):
+                return item
+            
+            # Check if all values in the dictionary are dictionaries themselves
+            if all(isinstance(v, dict | ComplexType) for v in item.values()):
+                # Transform the dictionary into a list of its values (nested dictionaries)
+                h = Hypothesis()
+                for v in item.values():
+                    h.update(v)
+                
+                # h.current.structure.update({"ps_key__": str})
+                return {"{ps_key__}": h.current}
+            else:
+                # If not all values are dictionaries, recursively apply transform to each value
+                return {k: transform(v) for k, v in item.items()}
+    
+        # Start the transformation process from the root of the structure
+        self.current.structure = transform(self.current.structure)
     
     def handle_listitem(self, k, v):
         list_hypothesis = Hypothesis()
@@ -307,13 +345,14 @@ class Hypothesis():
       
 if __name__ == "__main__":
 
-    hypothesis = Hypothesis()
+
+    # hypothesis = Hypothesis()
     # hypothesis.update({"name": "Alice", "age": 30, "address": {"street": "123 Main St", "city": "Anytown"}})
     # print("[HYPOTHESIS]", hypothesis.current)
     # hypothesis.update({"name": "Bob", "age": "unknown", "address": {"street": 1, "city": "Othertown", "zip": 12345}})
     # print("[HYPOTHESIS]", hypothesis.current)
 
-    # Now, let's try to infer the schema from the input list
+    # TODO: implement proper unit test framework.
     hypothesis = Hypothesis()
     for item in input:
         hypothesis.update(item)
@@ -333,5 +372,8 @@ if __name__ == "__main__":
 
     print("[HYPOTHESIS]", hypothesis.current)
 
-    h = Hypothesis({"results":[{"name":"WEBHOOKS","features":{"Webhooks":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/webhooks/v3","stage":"LATEST"}}},{"name":"EVENTS","features":{"Events":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/events/v3/events","stage":"DEVELOPER_PREVIEW"}}},{"name":"COMMUNICATION-PREFERENCES","features":{"Communications-status":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/communication-preferences/v3","stage":"DEVELOPER_PREVIEW"}}},{"name":"AUTH","features":{"Oauth":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/oauth/v1","stage":"LATEST"}}},{"name":"BUSINESS-UNITS","features":{"Business Units":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/business-units/v3","stage":"STABLE"}}},{"name":"ANALYTICS","features":{"Custom Behavioral Events":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/events/v3/send","stage":"DEVELOPER_PREVIEW"}}},{"name":"CMS","features":{"Domains":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/domains","stage":"DEVELOPER_PREVIEW"},"Source Code":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/source-code","stage":"DEVELOPER_PREVIEW"},"Blog-posts":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/blogs/blog-posts","stage":"DEVELOPER_PREVIEW"},"Authors":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/blogs/authors","stage":"DEVELOPER_PREVIEW"},"Url-redirects":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/url-redirects","stage":"DEVELOPER_PREVIEW"},"Performance":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/performance","stage":"DEVELOPER_PREVIEW"},"Hubdb":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/hubdb","stage":"DEVELOPER_PREVIEW"},"Tags":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/blogs/tags","stage":"DEVELOPER_PREVIEW"},"Audit-logs":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/audit-logs","stage":"DEVELOPER_PREVIEW"},"Site-search":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/site-search","stage":"DEVELOPER_PREVIEW"}}},{"name":"MARKETING","features":{"Marketing-events-beta":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/marketing/v3/marketing-events-beta","stage":"LATEST"},"Transactional":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/marketing/v3/transactional","stage":"LATEST"}}},{"name":"AUTOMATION","features":{"Actions":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/automation/v4/actions","stage":"LATEST"}}},{"name":"CONVERSATIONS","features":{"Visitor Identification":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/conversations/v3/visitor-identification","stage":"LATEST"}}},{"name":"CRM","features":{"Crm Extensions":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/extensions/sales-objects/v1/object-types","stage":"LATEST"},"Products":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/products","stage":"LATEST"},"Crm Associations":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v4/associations","stage":"STABLE"},"Pipelines":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/pipelines","stage":"LATEST"},"Accounting":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/extensions/accounting","stage":"LATEST"},"Companies":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/companies","stage":"LATEST"},"Calling":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/extensions/calling","stage":"LATEST"},"Quotes":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/quotes","stage":"LATEST"},"Deals":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/deals","stage":"LATEST"},"Imports":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/imports","stage":"LATEST"},"Schemas":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/schemas","stage":"LATEST"},"Properties":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/properties","stage":"LATEST"},"Associations":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/associations","stage":"LATEST"},"Owners":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/owners","stage":"LATEST"},"Timeline":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/timeline","stage":"LATEST"},"Contacts":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/contacts","stage":"LATEST"},"Feedback Submissions":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/feedback_submissions","stage":"DEVELOPER_PREVIEW"},"Objects":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects","stage":"LATEST"},"Videoconferencing":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/extensions/videoconferencing","stage":"LATEST"},"Tickets":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/tickets","stage":"LATEST"},"Line Items":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/line_items","stage":"LATEST"}}}]})
+    h = Hypothesis(
+        {"results":[{"name":"WEBHOOKS","features":{"Webhooks":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/webhooks/v3","stage":"LATEST"}}},{"name":"EVENTS","features":{"Events":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/events/v3/events","stage":"DEVELOPER_PREVIEW"}}},{"name":"COMMUNICATION-PREFERENCES","features":{"Communications-status":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/communication-preferences/v3","stage":"DEVELOPER_PREVIEW"}}},{"name":"AUTH","features":{"Oauth":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/oauth/v1","stage":"LATEST"}}},{"name":"BUSINESS-UNITS","features":{"Business Units":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/business-units/v3","stage":"STABLE"}}},{"name":"ANALYTICS","features":{"Custom Behavioral Events":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/events/v3/send","stage":"DEVELOPER_PREVIEW"}}},{"name":"CMS","features":{"Domains":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/domains","stage":"DEVELOPER_PREVIEW"},"Source Code":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/source-code","stage":"DEVELOPER_PREVIEW"},"Blog-posts":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/blogs/blog-posts","stage":"DEVELOPER_PREVIEW"},"Authors":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/blogs/authors","stage":"DEVELOPER_PREVIEW"},"Url-redirects":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/url-redirects","stage":"DEVELOPER_PREVIEW"},"Performance":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/performance","stage":"DEVELOPER_PREVIEW"},"Hubdb":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/hubdb","stage":"DEVELOPER_PREVIEW"},"Tags":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/blogs/tags","stage":"DEVELOPER_PREVIEW"},"Audit-logs":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/audit-logs","stage":"DEVELOPER_PREVIEW"},"Site-search":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/cms/v3/site-search","stage":"DEVELOPER_PREVIEW"}}},{"name":"MARKETING","features":{"Marketing-events-beta":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/marketing/v3/marketing-events-beta","stage":"LATEST"},"Transactional":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/marketing/v3/transactional","stage":"LATEST"}}},{"name":"AUTOMATION","features":{"Actions":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/automation/v4/actions","stage":"LATEST"}}},{"name":"CONVERSATIONS","features":{"Visitor Identification":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/conversations/v3/visitor-identification","stage":"LATEST"}}},{"name":"CRM","features":{"Crm Extensions":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/extensions/sales-objects/v1/object-types","stage":"LATEST"},"Products":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/products","stage":"LATEST"},"Crm Associations":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v4/associations","stage":"STABLE"},"Pipelines":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/pipelines","stage":"LATEST"},"Accounting":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/extensions/accounting","stage":"LATEST"},"Companies":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/companies","stage":"LATEST"},"Calling":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/extensions/calling","stage":"LATEST"},"Quotes":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/quotes","stage":"LATEST"},"Deals":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/deals","stage":"LATEST"},"Imports":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/imports","stage":"LATEST"},"Schemas":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/schemas","stage":"LATEST"},"Properties":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/properties","stage":"LATEST"},"Associations":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/associations","stage":"LATEST"},"Owners":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/owners","stage":"LATEST"},"Timeline":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/timeline","stage":"LATEST"},"Contacts":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/contacts","stage":"LATEST"},"Feedback Submissions":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/feedback_submissions","stage":"DEVELOPER_PREVIEW"},"Objects":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects","stage":"LATEST"},"Videoconferencing":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/extensions/videoconferencing","stage":"LATEST"},"Tickets":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/tickets","stage":"LATEST"},"Line Items":{"openAPI":"https://api.hubspot.com/api-catalog-public/v1/apis/crm/v3/objects/line_items","stage":"LATEST"}}}]}
+        , collapse_dynamic=True
+        )
     print("[HYPOTHESIS]", h.current)

@@ -144,4 +144,21 @@ Why is this useful? Because it allows us to incrementally validate data. If we v
 
 Lists nested in lists **currently stop the recursive process**. So you will just get a Type `list`.
 
-So, now, at any moment, we have the type that is used by that key. So how do we deal with the dynamic keyname case? Since there is no logical way to destinguish
+So, now, at any moment, we have the type that is used by that key. So how do we deal with the dynamic keyname case? Well, observe that dynamic keynames are often only used when the value is a dictionary. Since this is the most important use-case, we limit ourselves to this, because the most prevalent case is one where ALL the keys in a dictionary will have dictionaries as values. In other cases, I see simply no way to analytically solve this problem.
+
+So: you can collapse these cases by passing the collapse_dynamic flag when instantiating a Hypothesis object. For an OpenAPI spec, we get
+```
+{
+    "results": [
+        {
+            "name": "<class 'str'>",
+            "features": {
+                "{ps_key__}": {
+                    "openAPI": "<class 'type'>",
+                    "stage": "<class 'type'>"
+                }
+            }
+        }
+    ]
+}
+```
