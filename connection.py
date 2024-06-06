@@ -16,8 +16,9 @@ from requests import Response, Session
 
 # custom
 from . import regex, parsing
-from .errors import add_error
+from .errors import add_error, ErrorHandlingMeta
 from .helpers import flatten_dict
+from .inference import Hypothesis
 
 # supabase-py
 from gotrue import SyncMemoryStorage
@@ -30,7 +31,7 @@ DEFAULT_FILE_SIZE_LIMIT = 26000000
 
 # TODO: implement caching strategy when referencing data in config.
 # Right now, we're just unpacking a list and returning it itself.
-# This can introduce bugs if the data contains the {var} syntax.
+# This could introduce bugs if the data contains the {var} syntax. (??)
 # One strategy could be to protect the data keyword.
 # We should also definitely consider only 'pulling up' lists with the flatten_dict helper function..
 # ..if the var is not key_callable.
@@ -99,8 +100,7 @@ class ServiceRoleClient(AnyClient):
             os.environ.get("SUPABASE_SERVICE_ROLE")
         )
 
-
-class Callables():
+class Callables(metaclass=ErrorHandlingMeta):
     """Class to define explicit methods callable from config.
     Important: you need to add type hints and return signatures.
     """
@@ -232,6 +232,10 @@ class Callables():
         
         return self.parse_doctype(res, headers["Content-Type"])
 
+    def _transform(self, data: list, spec: dict) -> dict | str | list:
+        """Transform data according to a glom spec"""
+        return parsing.transform(data, spec)
+    
     def new_session(self, auth, headers):
         """Create a new session"""
 
@@ -277,7 +281,7 @@ class Config():
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-class Writeables():
+class Writeables(metaclass=ErrorHandlingMeta):
     """Class to define explicit methods callable from config"""
     def __init__(self, config=None, debug=False):
         self.config = config
@@ -285,34 +289,37 @@ class Writeables():
         self.decoded = getattr(self.config, "decoded", None)
         self.metadata = getattr(self.config, "metadata", None)
 
-    @add_error("Error calling function", 472)
-    def toSupa_(self, data, table: str, schema: str = "etl", overwrite: bool=False) -> None:
+    def toSupa_(self, data, table: str=None, schema: str = None, overwrite: bool=False) -> None:
         """
         Upsert data to supabase table. You need a supabase session cookie. 
         Let me know if you have any trouble here, I can help.
         """
 
+        # TODO: add hypothesis object to request metadata in metadata table.
+        # hypothesis = Hypothesis(data).current
+        # print(json.dumps(data, indent=2))
+        # print("Hypothesis:", hypothesis)
+
         if overwrite: print("[WARNING] overwrite needs implementation")
         if self.decoded is None: raise ValueError("invalid session")
 
-        client = AnyClient(self.decoded.token, schema=schema).client
+        client = AnyClient(self.decoded.token, schema="etl").client
         user_tld = client.from_("organization").select("tld").single().execute().data["tld"]
         newclient = AnyClient(self.decoded.token, schema=user_tld).client
 
         try:
+
             res = newclient.from_("metadata").insert({
-                "connectionId": self.metadata["connectionId"] or None,
-                "userId": self.decoded.sub or None,
-                "runId": self.metadata["runId"] or None
+                "user_id": self.decoded.sub or None,
+                "run_id": self.metadata["run_id"] or None,
+                "data": json.dumps(data)
                 }, returning="representation").execute()
 
-            print("[DATA]", data)
-            print("[META]", res.data)
-
-            return newclient.from_(table).insert({
-                "metaId": res.data[0]["id"],
-                "html": data
-                }).execute()
+            return res
+            # retu rn newclient.from_(table).insert({
+            #     "metaId": res.data[0]["id"],
+            #     "html": data
+            #     }).execute()
         except:
             print("Table does not exist. Creating...")
             print("TODO: implement type-safe RPC call to create table.")
@@ -639,22 +646,6 @@ class Connection():
         # Define non-callable keys specified in config as attributes in self.config:
         self.set_function_attribute(key, value)
 
-        # handle writeables
-        if self.key_writeable(key):
-            func = getattr(self.writeables, key)
-            iargs = getattr(self.config, key)
-
-            match iargs:
-                case dict():
-                    do = self.writeables.caller(func, **iargs)
-                    
-                    print(do)
-                case list():
-                    for i in iargs:
-                        do = self.writeables.caller(func, **i)
-        
-                        print(do)
-
         # handle callables
         if self.key_callable(key):            
             # TODO: match function arguments with passed kwargs in self.config.<funcName>
@@ -683,15 +674,32 @@ class Connection():
                                 callables_obj=self.functions,
                                 **i).data
                             ])
-                    
-            self.config.__setattr__(key, self.data.data)    
-            print("Setting:", key, "-->", type(self.data.data).__name__ + ":", self.functions.censor(json.dumps(self.data.data)))
+                
+            self.set_function_attribute(key, self.data.data)
+            # self.config.__setattr__(key, self.data.data)    
+            # print("Setting:", key, "-->", type(self.data.data).__name__ + ":", self.functions.censor(json.dumps(self.data.data)))
 
             # after calling a function, we want our value (as defined in config) 
             # to be equivalent to the data in the DataOBJ.
             in_function_call = True
             path=[]
 
+        # handle writeables
+        if self.key_writeable(key):
+            func = getattr(self.writeables, key)
+            iargs = getattr(self.config, key)
+
+            match iargs:
+                case dict():
+                    do = self.writeables.caller(func, **iargs)
+                    
+                    print(do)
+                case list():
+                    for i in iargs:
+                        do = self.writeables.caller(func, **i)
+        
+                        print(do)
+        
         return value
 
 
@@ -718,7 +726,8 @@ class Connection():
             if isinstance(var, list):
                 for item in var:
                     try:
-                        lst.append(value.replace(f'{{{variable}}}', item))
+                        # TODO: NEEDS UNIT TEST
+                        lst.append(item)
                     except:
                         raise SyntaxError("""Unable to replace variable with value""")
             else:

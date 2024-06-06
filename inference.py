@@ -24,9 +24,11 @@
 from typing import Set, Type, List, Dict, Any, Union, Optional, get_type_hints, get_origin, get_args, TypeVar, Generic
 from pydantic import BaseModel
 import json
-from helpers import flatten_dict
+# from .helpers import flatten_dict
 from functools import reduce, lru_cache
+from glom import T
 
+DYNAMIC_KEYNAME = "{name}"
 
 input = [
     {
@@ -110,6 +112,12 @@ class ComplexType():
             default=lambda x: str(x) if not isinstance(x, ComplexType) else x.structure
             )
     
+    def __setitem__(self, key, value):
+        self.structure[key] = value
+
+    def __getitem__(self, key):
+        return self.structure[key]
+
     def update_with(self, other):
         """Recursively update this type with another, performing union operations at each level."""
         
@@ -125,6 +133,9 @@ class ComplexType():
     def items(self):
         return self.structure.items()
 
+    def keys(self):
+        return self.structure.keys()
+    
     def values(self):
         return self.structure.values()
     
@@ -251,9 +262,12 @@ class Hypothesis():
             # Recursively update the nested dictionary
             self.current.structure[k].update_with(Hypothesis(v).current)
         
+    def cast_instance_to_type_unless_type_instance(self, unit):
+        return unit if isinstance(unit, type) else type(unit)
+    
     def collapse_nested_dicts(self):
         """Collapse nested dictionaries into a list of dictionaries.
-        BUG: converts str -> type because the type of a type is type.
+        NEEDS TEST: NOT converts str -> type because the type of a type is type. (fixed bug)
         Needs fixing in hypothesis logic (ignore casing type to type but return id)
         """
         def transform(item):
@@ -273,7 +287,7 @@ class Hypothesis():
                     h.update(v)
                 
                 # h.current.structure.update({"ps_key__": str})
-                return {"{ps_key__}": h.current}
+                return {f"{DYNAMIC_KEYNAME}": h.current}
             else:
                 # If not all values are dictionaries, recursively apply transform to each value
                 return {k: transform(v) for k, v in item.items()}
@@ -288,7 +302,9 @@ class Hypothesis():
             if isinstance(elem, dict):
                 list_hypothesis.update(elem)
             else:
-                list_types.append(type(elem))
+                list_types.append(
+                    self.cast_instance_to_type_unless_type_instance(elem)
+                    )
         
         no_hyp = list_hypothesis.current.structure == {}
         no_list = list_types == []
@@ -333,7 +349,7 @@ class Hypothesis():
                 self.handle_listitem(k, v)
             
             else:
-                new_type = type(v)
+                new_type = self.cast_instance_to_type_unless_type_instance(v)
                 if k in self.current.structure:
                     self.current.structure[k] = self.current.union_types(
                         self.current.structure[k], 
@@ -342,7 +358,24 @@ class Hypothesis():
                 else:
                     self.current.structure[k] = new_type
 
-      
+def glom_spec_cascase_dynamic_keyname_downwards_return_list_recursive(spec: dict|ComplexType):
+    """Recursively cascade dynamic keynames downwards in a glom spec."""
+    def transform(item, cascade=False):
+        if isinstance(item, list):
+            return [transform(i) for i in item]
+        
+        if not isinstance(item, dict | ComplexType):
+            return item
+        
+        # here it is a dict
+        if cascade: item["_id"] = T
+        if DYNAMIC_KEYNAME in item.keys():
+            return [transform(item[DYNAMIC_KEYNAME], cascade=True)]
+
+        return {k: transform(v) for k, v in item.items()}
+    
+    return transform(spec)
+
 if __name__ == "__main__":
 
 
@@ -377,3 +410,4 @@ if __name__ == "__main__":
         , collapse_dynamic=True
         )
     print("[HYPOTHESIS]", h.current)
+    print("[GLOM]", glom_spec_cascase_dynamic_keyname_downwards_return_list_recursive(h.current))
