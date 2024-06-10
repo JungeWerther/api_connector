@@ -331,10 +331,8 @@ class Writeables(metaclass=ErrorHandlingMeta):
             #     "metaId": res.data[0]["id"],
             #     "html": data
             #     }).execute()
-        except:
-            print("Table does not exist. Creating...")
-            print("TODO: implement type-safe RPC call to create table.")
-            raise SyntaxError("Table does not exist....")
+        except Exception as e:
+            raise e
             # tables = newclient.rpc("create_table", {"name": table})
 
     # def toStorage_(self, data, bucket: str, folder: str, filename: str, overwrite: bool):
