@@ -23,7 +23,7 @@ from .inference import Hypothesis
 # supabase-py
 from gotrue import SyncMemoryStorage
 from supabase import create_client, Client
-from supabase.lib.client_options import ClientOptions
+from supabase.lib.client_options import ClientOptions, DEFAULT_HEADERS
 from storage3.types import CreateOrUpdateBucketOptions
 
 # Default file size limit = 26MB
@@ -40,8 +40,8 @@ class Supabase(Client):
     """Supabase client class. Inherits from supabase.Client."""
 
     def __init__(self, schema="public"):
-        self.url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
-        self.key = os.environ.get("SUPABASE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+        self.url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+        self.key = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
 
         super().__init__(
             self.url,
@@ -57,30 +57,41 @@ class Supabase(Client):
 
 class AnyClient():
     """Client class for any supabase client. Inherits from supabase.Client."""
-    def __init__(self, token: str=None, schema: str=None):
+    def __init__(self, token: str=None, schema: str=None, key: str=None):
         self.url: str = self.get_supabase_url()
-        self.key: str = token
+        self.key: str = key or self.get_supabase_anon_key()
+        
+        if token is not None:
+            DEFAULT_HEADERS["Authorization"] = f"Bearer {token}"
+        
         self.client: Client = create_client(
             self.url,
             self.key,
             ClientOptions(
                 schema=schema,
-                storage=SyncMemoryStorage()
+                storage=SyncMemoryStorage(),
+                headers=DEFAULT_HEADERS
                 )
             )
 
     def get_supabase_url(self):
         return (
-            os.environ.get("SUPABASE_URL") or
-            os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+            os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or
+            os.environ.get("SUPABASE_URL")
+        )
+    
+    def get_supabase_anon_key(self):
+        return (
+            os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY") or
+            os.environ.get("SUPABASE_KEY")
         )
 
 class AnonClient(AnyClient):
     """AnonClient class. To use ANONKEY jwt. Inherits from AnyClient."""
     def __init__(self, schema: str):
         super().__init__(
-            os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-            schema
+            key=self.get_supabase_anon_key(),
+            schema=schema
             )
 
 class ServiceRoleClient(AnyClient):
@@ -90,8 +101,8 @@ class ServiceRoleClient(AnyClient):
     """
     def __init__(self, schema: str):
         super().__init__(
-            self.get_service_role_key(),
-            schema
+            key=self.get_service_role_key(),
+            schema=schema
             )
 
     def get_service_role_key(self):
