@@ -7,7 +7,6 @@ import time
 import getpass
 
 # data
-import csv
 import hashlib
 
 # requests
@@ -24,7 +23,9 @@ from .inference import Hypothesis
 from gotrue import SyncMemoryStorage
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions, DEFAULT_HEADERS
-from storage3.types import CreateOrUpdateBucketOptions
+# from storage3.types import CreateOrUpdateBucketOptions
+
+# TODO: improve parse_doctype to handle more doctypes more cleanly.
 
 # Default file size limit = 26MB
 DEFAULT_FILE_SIZE_LIMIT = 26000000
@@ -35,25 +36,6 @@ DEFAULT_FILE_SIZE_LIMIT = 26000000
 # One strategy could be to protect the data keyword.
 # We should also definitely consider only 'pulling up' lists with the flatten_dict helper function..
 # ..if the var is not key_callable.
-
-class Supabase(Client):
-    """Supabase client class. Inherits from supabase.Client."""
-
-    def __init__(self, schema="public"):
-        self.url = os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-        self.key = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-
-        super().__init__(
-            self.url,
-            self.key
-            )
-
-        self.options.schema = schema
-        self.schema = schema
-
-    def create_client(self, options=None):
-        """Create a new client with the same key and url."""
-        return create_client(self.url, self.key, options or self.options)
 
 class AnyClient():
     """Client class for any supabase client. Inherits from supabase.Client."""
@@ -145,29 +127,32 @@ class Callables(metaclass=ErrorHandlingMeta):
     @add_error("Unable to parse response (hint: change the Content-Type)", 472)
     def parse_doctype(self, res: Response, doctype: str) -> dict | str:
         """Parse a doctype from a string"""
+        
         print("Parsing doctype:", doctype)
-        print("Response:", res.text[:100])
+        if self.debug: print("Response:", res.text[:100])
+        
         match doctype:
             case "application/xml":
                 return parsing.parse_xml(res.text)
             case "application/json":
-                return res.json()
+                try: return res.json()
+                except: return res.text
+
             case "text/csv":
-                r = csv.DictReader(res.text.splitlines())
-                return {"response": list(r)}
+                return parsing.parse_csv(res.text)
+            
             case "application/html":
-                # the xml parser also works for html
+                # the xml parser also works for html (food for thought)
                 return parsing.parse_html(res.text)
             case _:
-                return res.json()
+                return res.text
 
     @add_error("Error calling function", 472)
     def _request(self,
             url=None,
-            base_url=None,
             headers=None,
+            data=None,
             method=None,
-            rel_url="",
             auth=None,
             session: Session=None,
             sleep=0,
@@ -182,12 +167,6 @@ class Callables(metaclass=ErrorHandlingMeta):
             auth = (auth["user"], auth["password"]) if auth is not None else None
         except Exception as e:
             raise SyntaxError("auth must be a dict with keys 'user' and 'password'") from e
-
-        if url is None:
-            if base_url is not None:
-                url = base_url + rel_url
-            else:
-                raise SyntaxError("Both url and base_url undefined")
 
         if debug:
             print("Requesting:", url)
@@ -226,10 +205,13 @@ class Callables(metaclass=ErrorHandlingMeta):
             else:
                 print("Response:")
                 print(type(res))
+        elif method == "PUT":
+            print("PUT request")
+            res = session.put(url, data=data)
         
         elif method == "POST":
             print("POST request")
-            res = session.post(url)
+            res = session.post(url, data=data)
         else:
             raise ValueError(f"{method} needs implementation")
 
@@ -280,10 +262,6 @@ class Config():
     """Class used as target for configuration settings. Define special methods here."""
     def __init__(self, **kwargs):
 
-        # initialize config with any passed kwargs
-        # for k, v in kwargs.items():
-        #     setattr(self, k, v)
-
         # does this work?
         self.add_attributes(**kwargs)
 
@@ -300,7 +278,7 @@ class Writeables(metaclass=ErrorHandlingMeta):
         self.decoded = getattr(self.config, "decoded", None)
         self.metadata = getattr(self.config, "metadata", None)
 
-    def toSupa_(self, data, table: str=None, schema: str = None, overwrite: bool=False) -> None:
+    def toSupa_(self, data: object) -> None:
         """
         Upsert data to supabase table. You need a supabase session cookie. 
         Let me know if you have any trouble here, I can help.
@@ -311,7 +289,6 @@ class Writeables(metaclass=ErrorHandlingMeta):
         # print(json.dumps(data, indent=2))
         # print("Hypothesis:", hypothesis)
 
-        if overwrite: print("[WARNING] overwrite needs implementation")
         if self.decoded is None: raise ValueError("invalid session")
 
         client = AnyClient(self.decoded.token, schema="etl").client
