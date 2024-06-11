@@ -293,24 +293,13 @@ class Writeables(metaclass=ErrorHandlingMeta):
 
         client = AnyClient(self.decoded.token, schema="etl").client
         user_tld = client.from_("organization").select("tld").single().execute().data["tld"]
-        newclient = AnyClient(self.decoded.token, schema=user_tld).client
-
-        try:
-
-            res = newclient.from_("metadata").insert({
-                "user_id": self.decoded.sub or None,
-                "run_id": self.metadata["run_id"] or None,
-                "data": json.dumps(data)
-                }, returning="representation").execute()
-
-            return res
-            # retu rn newclient.from_(table).insert({
-            #     "metaId": res.data[0]["id"],
-            #     "html": data
-            #     }).execute()
-        except Exception as e:
-            raise e
-            # tables = newclient.rpc("create_table", {"name": table})
+        res = client.from_(f"__{user_tld}").insert({
+            "user_id": self.decoded.sub or None,
+            "run_id": self.metadata["run_id"] or None,
+            "data": json.dumps(data)
+            }, returning="representation").execute()
+        
+        return res
 
     # def toStorage_(self, data, bucket: str, folder: str, filename: str, overwrite: bool):
     #    TODO: implement
