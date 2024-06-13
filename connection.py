@@ -159,7 +159,7 @@ class Callables(metaclass=ErrorHandlingMeta):
             debug=False,
             ) -> dict | str | list:
         """send a request with the specified parameters
-        TODO: implement POST, PUT methods.
+        (TODO) Currently only GET and POST are implemented.
         """
 
         print("Requesting:", url)
@@ -239,23 +239,26 @@ class Callables(metaclass=ErrorHandlingMeta):
         setattr(self.config, "session", s)
         return s
 
-    def _fromFile(self, path):
-        """Read a file and return its contents as a json object. Disabled in production."""
-        try:
-            with open(path, "r") as f:
-                obj = json.loads(f.read())
-            if self.debug: print("Reading:", path)
-        except:
-            if path is not None:
-                raise ValueError("Unable to read file:", path)
-            else:
-                raise SyntaxError("'path' undefined")
+    # def _fromFile(self, path):
+    #     """Read a file and return its contents as a json object. Disabled in production."""
+    #     try:
+    #         with open(path, "r") as f:
+    #             obj = json.loads(f.read())
+    #         if self.debug: print("Reading:", path)
+    #     except:
+    #         if path is not None:
+    #             raise ValueError("Unable to read file:", path)
+    #         else:
+    #             raise SyntaxError("'path' undefined")
 
-        return obj
+    #     return obj
 
-    def _test(self, base_url, rel_url="") -> str:
-        """Test function. Can you pass base_url and rel_url to get url?"""
-        url = base_url + rel_url
+    def _combine(self, base: str, end: str="") -> str:
+        """Concatenates base(url) and append an end(url). Example:\n\n
+        base = "https://api.com/" and end = ["users", "1"]. Then it will return 
+        "https://api.com/users" and "https://api.com/1"
+        """
+        url = str(base) + str(end)
         return url
 
 class Config():
