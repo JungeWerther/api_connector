@@ -16,7 +16,7 @@ from requests import Response, Session
 # custom
 from . import regex, parsing
 from .errors import add_error, ErrorHandlingMeta
-from .helpers import flatten_dict
+from .helpers import flatten_dict, date_format
 from .inference import Hypothesis
 
 # supabase-py
@@ -100,6 +100,8 @@ class Callables(metaclass=ErrorHandlingMeta):
     def __init__(self, config=None, debug=False):
         self.config = config
         self.debug = debug
+        self.decoded = getattr(self.config, "decoded", None)
+        self.metadata = getattr(self.config, "metadata", None)
 
     def caller(self, func, **kwargs):
         """Flatten kwargs and call func on each instance. Return aggregate"""
@@ -225,9 +227,9 @@ class Callables(metaclass=ErrorHandlingMeta):
         
         return self.parse_doctype(res, headers["Content-Type"])
 
-    def _transform(self, data: list, spec: dict) -> dict | str | list:
-        """Transform data according to a glom spec"""
-        return parsing.transform(data, spec)
+    # def _transform(self, data: list, spec: dict) -> dict | str | list:
+    #     """Transform data according to a glom spec"""
+    #     return parsing.transform(data, spec)
     
     def new_session(self, auth, headers):
         """Create a new session"""
@@ -239,6 +241,35 @@ class Callables(metaclass=ErrorHandlingMeta):
         setattr(self.config, "session", s)
         return s
 
+    def _last_successful_run(self, startDate: str=None) -> str:
+        """Returns the last DATE in which a run with this exact workflow configuration was successfully executed."""
+        
+        # should always be present.
+        metadata = self.metadata
+        connection_id = metadata["connection_id"]
+
+        client = AnyClient(self.decoded.token, schema="etl").client
+        
+        last_date = client.table(
+                "run"
+            ).select(
+                "start"
+            ).eq(
+                "connection_id", 
+                connection_id
+            ).eq(
+                "success",
+                True
+            ).order(
+                "start", desc=True
+            ).limit(1).execute()
+
+        
+        if hasattr(last_date, "data") and len(last_date.data) == 1:
+            return date_format(last_date.data[0]["start"], startDate)
+        else:
+            return startDate
+        
     # def _fromFile(self, path):
     #     """Read a file and return its contents as a json object. Disabled in production."""
     #     try:
@@ -255,7 +286,7 @@ class Callables(metaclass=ErrorHandlingMeta):
 
     def _combine(self, base: str, end: str="") -> str:
         """Concatenates base(url) and append an end(url). Example:\n\n
-        base = "https://api.com/" and end = ["users", "1"]. Then it will return 
+        base = "https://api.com/" and end = ["users", "1"]. \n Then it will return 
         "https://api.com/users" and "https://api.com/1"
         """
         url = str(base) + str(end)
@@ -303,54 +334,6 @@ class Writeables(metaclass=ErrorHandlingMeta):
             }, returning="representation").execute()
         
         return res
-
-    # def toStorage_(self, data, bucket: str, folder: str, filename: str, overwrite: bool):
-    #    TODO: implement
-    #     """Upsert data to supabase table. Needs implementation."""
-
-    #     if self.decoded is None: raise ValueError("invalid session")
-    #     client = AnyClient(self.decoded.token, schema="storage").client
-    #     print("client", client)
-
-    #     raise ValueError("Not implemented")
-    #     # if bucket in client.storage.list_buckets():
-        #     print("bucket exists")
-        # else:
-        #     print(f"bucket '{bucket}' does not exist. creating...")
-        #     id = uuid.uuid4().__str__()
-
-        #     res = client.storage.create_bucket(
-        #         id, 
-        #         bucket,
-        #         CreateOrUpdateBucketOptions(
-        #             public=False,
-        #             file_size_limit=DEFAULT_FILE_SIZE_LIMIT,
-        #             allowed_mime_types=[
-        #             "application/json", 
-        #             "application/xml", 
-        #             "text/csv", 
-        #             "application/html",
-        #             "application/pdf",
-        #             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        #             "application/vnd.ms-powerpoint",
-        #             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        #             "application/vnd.visio",
-        #             "application/vnd.ms-excel",
-        #             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",    
-        #             "application/msword"
-        #             "image/*",
-        #             "video/*",
-        #             "audio/*",
-        #             "text/*",
-        #             ]))
-        # print(res)
-
-    # def toFile_(self, data, path):
-    #     """Write data that is currently cached in self.config.data to file. Disabled in production
-    #     """
-    #     raise ValueError("File storage is disabled")
-    #     with open(path, "wt") as f:
-    #         json.dump(data, f, indent=2)
     
     @add_error(f"Error calling function {__name__}", 472)
     def caller(self, func, **kwargs):
